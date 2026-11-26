@@ -139,7 +139,3 @@ build.bat
 | `frontend/wailsjs/` | Wails 自動產生的前端綁定 |
 | `build/` | 圖示、Windows 資訊檔與建置輸出 |
 | `build.bat` | 建置腳本 |
-
-### Git
-- `.gitignore`：`build/bin/`、`backup_*/`、`.bak_*/`
-- 平常修改不另外備份；需要時才備份到 `backup_last`
