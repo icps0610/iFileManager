@@ -245,6 +245,20 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class ClipboardFiles {
+	    paths: string[];
+	    cut: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ClipboardFiles(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.paths = source["paths"];
+	        this.cut = source["cut"];
+	    }
+	}
 	export class Locations {
 	    drives: fsops.Drive[];
 	    quick: fsops.Place[];

@@ -41,7 +41,6 @@
   <div class="card" id="selCard" aria-live="polite">
     <div class="t" id="selTitle"></div>
     <div class="m" id="selMeta"></div>
-    <button class="link" id="btnCalc" data-act="calc" hidden>計算資料夾大小</button>
   </div>
 
   <details open data-sec="places">
@@ -72,6 +71,8 @@
       <!-- 原「更多」區塊合併進來 -->
       <button class="btn" data-act="reveal" id="b-reveal" title="在 Windows 檔案總管中顯示">檔案總管中顯示</button>
       <button class="btn" data-act="copyPath" id="b-copyPath">複製路徑</button>
+      <!-- 一次計算目前資料夾內所有子資料夾的大小，結果顯示在「大小」欄，可依大小排序 -->
+      <button class="btn wide" data-act="calcDirs" id="b-calcDirs">計算所有子資料夾大小</button>
       <!-- 刪除並排：資源回收筒＝橘色，永久刪除＝紅色 -->
       <button class="btn trash" data-act="trash" id="b-trash" title="刪除（移到資源回收筒）">資源回收筒<small>Del</small></button>
       <button class="btn danger" data-act="deletePerm" id="b-deletePerm" title="永久刪除（無法復原）">永久刪除<small>Shift+Del</small></button>

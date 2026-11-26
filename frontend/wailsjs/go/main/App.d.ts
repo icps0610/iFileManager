@@ -11,6 +11,8 @@ export function CancelOp():Promise<void>;
 
 export function CheckConflicts(arg1:Array<string>,arg2:string):Promise<fsops.ConflictInfo>;
 
+export function ClearClipboard():Promise<void>;
+
 export function Copy(arg1:Array<string>,arg2:string,arg3:string):Promise<fsops.Result>;
 
 export function CreateDir(arg1:string,arg2:string):Promise<string>;
@@ -18,6 +20,8 @@ export function CreateDir(arg1:string,arg2:string):Promise<string>;
 export function CreateFile(arg1:string,arg2:string):Promise<string>;
 
 export function DeletePermanent(arg1:Array<string>):Promise<fsops.Result>;
+
+export function GetClipboard():Promise<main.ClipboardFiles>;
 
 export function ListDir(arg1:string):Promise<fsops.Listing>;
 
@@ -38,6 +42,8 @@ export function RenameApply(arg1:Array<string>,arg2:fsops.RenameRule):Promise<Ar
 export function RenamePreview(arg1:Array<string>,arg2:fsops.RenameRule):Promise<Array<fsops.RenameItem>>;
 
 export function Reveal(arg1:string):Promise<void>;
+
+export function SetClipboard(arg1:Array<string>,arg2:boolean):Promise<void>;
 
 export function ShellMenu(arg1:string,arg2:Array<string>,arg3:boolean):Promise<string>;
 

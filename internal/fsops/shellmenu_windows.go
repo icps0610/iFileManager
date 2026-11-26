@@ -46,6 +46,7 @@ var (
 	procGetMenuItemCount    = user32.NewProc("GetMenuItemCount")
 	procGetMenuItemInfoW    = user32.NewProc("GetMenuItemInfoW")
 	procEnableMenuItem      = user32.NewProc("EnableMenuItem")
+	procInsertMenuW         = user32.NewProc("InsertMenuW")
 	procGetModuleHandleW    = kernel32.NewProc("GetModuleHandleW")
 
 	procSHParseDisplayName = shell32.NewProc("SHParseDisplayName")
@@ -84,6 +85,7 @@ const (
 	mfsGrayed   = 0x0003 // MFS_GRAYED | MFS_DISABLED
 	mfByPos     = 0x0400
 	mfEnabled   = 0x0000
+	mfString    = 0x0000
 
 	vkShift = 0x10
 )
@@ -434,6 +436,35 @@ func (m *shellMenu) enablePaste() {
 	}
 }
 
+// idOwnPaste 是本程式自己加入的「貼上」選單項目 ID（不在 Shell 命令範圍 idCmdFirst～idCmdLast 內）。
+const idOwnPaste = idCmdLast + 1
+
+// ensurePaste：在檔案上按右鍵時，Windows 的選單本來就沒有「貼上」（檔案總管也一樣，只有資料夾與空白處才有）。
+// 剪貼簿有檔案時，自己在「複製」後面補一個「貼上」，貼到目前資料夾。
+func (m *shellMenu) ensurePaste() {
+	n := m.itemCount()
+	pos := -1
+	for i := 0; i < n; i++ {
+		mii := menuItemInfo{Mask: miimID | miimSubmenu}
+		mii.Size = uint32(unsafe.Sizeof(mii))
+		r, _, _ := procGetMenuItemInfoW.Call(m.hmenu, uintptr(i), 1, uintptr(unsafe.Pointer(&mii)))
+		if r == 0 || mii.SubMenu != 0 || mii.ID < idCmdFirst || mii.ID > idCmdLast {
+			continue
+		}
+		switch commandVerb(m.cm, uintptr(mii.ID-idCmdFirst)) {
+		case "paste":
+			return // 系統選單已經有「貼上」
+		case "copy":
+			pos = i + 1
+		}
+	}
+	if pos < 0 {
+		pos = 0
+	}
+	text, _ := syscall.UTF16PtrFromString("貼上(&P)")
+	procInsertMenuW.Call(m.hmenu, uintptr(pos), mfByPos|mfString, idOwnPaste, uintptr(unsafe.Pointer(text)))
+}
+
 func invokeCommand(cm, hwnd, id uintptr, pt point, dir string) error {
 	var dirW *uint16
 	if dir != "" {
@@ -573,6 +604,7 @@ func doMenu(hwnd uintptr, req *menuReq) menuRes {
 	defer m.close()
 	if req.canPaste {
 		m.enablePaste()
+		m.ensurePaste()
 	}
 	currentMenu = m
 	defer func() { currentMenu = nil }()
@@ -586,6 +618,10 @@ func doMenu(hwnd uintptr, req *menuReq) menuRes {
 	if cmd == 0 { // 取消
 		restore()
 		return menuRes{}
+	}
+	if cmd == idOwnPaste { // 本程式自己加上的「貼上」
+		restore()
+		return menuRes{action: "paste"}
 	}
 	id := uintptr(cmd - idCmdFirst)
 	verb := commandVerb(m.cm, id)

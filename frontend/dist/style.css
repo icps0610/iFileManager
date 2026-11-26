@@ -206,6 +206,8 @@ body.resizing.vresize, body.resizing.vresize * { cursor: row-resize !important; 
 
 .list { position: relative; flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; outline: 0; }
 .spacer { position: relative; width: 100%; }
+/* 拉框選取的方框 */
+.marquee { position: absolute; z-index: 5; pointer-events: none; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 2px; }
 .rows { position: absolute; inset: 0 0 auto 0; }
 .row {
   position: absolute; left: 0; right: 0; height: var(--rowh);

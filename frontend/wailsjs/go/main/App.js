@@ -18,6 +18,10 @@ export function CheckConflicts(arg1, arg2) {
   return window['go']['main']['App']['CheckConflicts'](arg1, arg2);
 }
 
+export function ClearClipboard() {
+  return window['go']['main']['App']['ClearClipboard']();
+}
+
 export function Copy(arg1, arg2, arg3) {
   return window['go']['main']['App']['Copy'](arg1, arg2, arg3);
 }
@@ -32,6 +36,10 @@ export function CreateFile(arg1, arg2) {
 
 export function DeletePermanent(arg1) {
   return window['go']['main']['App']['DeletePermanent'](arg1);
+}
+
+export function GetClipboard() {
+  return window['go']['main']['App']['GetClipboard']();
 }
 
 export function ListDir(arg1) {
@@ -72,6 +80,10 @@ export function RenamePreview(arg1, arg2) {
 
 export function Reveal(arg1) {
   return window['go']['main']['App']['Reveal'](arg1);
+}
+
+export function SetClipboard(arg1, arg2) {
+  return window['go']['main']['App']['SetClipboard'](arg1, arg2);
 }
 
 export function ShellMenu(arg1, arg2, arg3) {

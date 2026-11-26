@@ -43,10 +43,11 @@ const S = {
     // split：左窗格佔的寬度比例（欄位顯示與檔名欄寬度是每個窗格各自的設定，存在 panes[i]）
   panes: [],
   active: 0,
-  clip: null,          // { mode: 'copy' | 'cut', dir, names:Set, paths:[] }
+  clip: null,          // { mode: 'copy' | 'cut', dir, names:Set, paths:[] }（同時寫入系統剪貼簿）
+  sysClip: false,      // 系統剪貼簿是否有檔案（檔案總管或系統右鍵選單複製的）
   boot: null,
   rowH: 41,
-  calc: null,          // { key, text }
+  calc: null,          // 子資料夾大小計算中：{ path, done, total }
 };
 
 function loadPrefs() {
@@ -96,6 +97,16 @@ function baseName(p) {
   const i = t.lastIndexOf(s);
   const b = i >= 0 ? t.slice(i + 1) : t;
   return b === '' || /^[A-Za-z]:$/.test(b) ? p : b;   // 根目錄：回傳原樣（如 C:\ 或 /）
+}
+
+// 上層資料夾路徑（與清單的 t.path 格式相同：磁碟機根目錄保留結尾分隔符號，如 C:\）
+function dirOf(p) {
+  const s = sepOf(p);
+  const t = p.length > 1 && p.endsWith(s) ? p.slice(0, -1) : p;
+  const i = t.lastIndexOf(s);
+  if (i < 0) return '';
+  const d = t.slice(0, i);
+  return /^[A-Za-z]:$/.test(d) || d === '' ? d + s : d;
 }
 
 function crumbsOf(p) {
@@ -471,11 +482,8 @@ function wirePane(pane) {
   d.rows.addEventListener('click', e => rowClick(pane, e));
   d.list.addEventListener('mousedown', e => {
     if (e.clientX - d.list.getBoundingClientRect().left > d.list.clientWidth) return;   // 點在捲軸上
-    if (e.target === d.list || e.target === d.spacer || e.target === d.rows) {
-      const t = tabOf(pane);
-      t.sel = new Set(); t.anchor = -1;
-      onSelChange();
-    }
+    // 點在空白處：開始拉框選取（沒有移動就放開＝清除選取，與原本相同）
+    if (e.button === 0 && (e.target === d.list || e.target === d.spacer || e.target === d.rows)) startMarquee(pane, e, -1);
   });
   d.list.addEventListener('contextmenu', e => onListContextMenu(pane, e));
   d.rows.addEventListener('dragstart', e => rowDragStart(pane, e));
@@ -507,7 +515,7 @@ function rebuildView(t) {
     let r = 0;
     if (key === 'name') r = collator.compare(a.name, b.name);
     else if (key === 'mod') r = a.mod - b.mod;
-    else if (key === 'size') r = a.size - b.size;
+    else if (key === 'size') r = sizeOf(t, a) - sizeOf(t, b);
     if (r === 0 && key !== 'name') r = collator.compare(a.name, b.name);
     return r * dir;
   });
@@ -705,7 +713,7 @@ function renderRows(pane) {
       `<span class="ico ${cls}">${svg}</span>` +
       `<span class="nm" title="${esc(displayName(t, e))}">${esc(displayName(t, e))}</span>` +
       `<span class="dt" title="${t.path === '' ? '' : fmtDate(e.mod)}">${t.path === '' || !e.mod ? '' : `${fmtDateParts(e.mod)[0]}<span class="tm"> ${fmtDateParts(e.mod)[1]}</span>`}</span>` +
-      `<span class="sz">${e.isDir ? '' : fmtSize(e.size)}</span></div>`;
+      `<span class="sz">${e.isDir ? (dirSizeOf(t, e) != null ? fmtSize(dirSizeOf(t, e)) : '') : fmtSize(e.size)}</span></div>`;
   }
   d.rows.innerHTML = html;
   if (!n) {
@@ -776,6 +784,8 @@ function rowMouseDown(pane, e) {
   const t = tabOf(pane), i = +row.dataset.i, ent = t.view[i];
   pane.pendingSingle = null;
   if (e.button === 0 && e.detail === 2 && !e.ctrlKey && !e.shiftKey) { openEntry(pane, ent); return; }
+  // 點在檔名文字右邊的空白：開始拉框選取（與檔案總管相同），不啟動拖曳
+  if (e.button === 0 && !e.shiftKey && inNameGap(row, e)) { e.stopPropagation(); startMarquee(pane, e, i); return; }
   if (e.shiftKey && t.anchor >= 0) selectRange(t, t.anchor, i);
   else if (e.ctrlKey || e.metaKey) {
     if (t.sel.has(ent.name)) t.sel.delete(ent.name); else t.sel.add(ent.name);
@@ -787,6 +797,90 @@ function rowMouseDown(pane, e) {
   }
   t.cursor = i;
   onSelChange();
+}
+
+// 滑鼠是否點在檔名欄、但在檔名文字右邊的空白處
+function inNameGap(row, e) {
+  const nm = row.querySelector('.nm');
+  if (!nm) return false;
+  const r = nm.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || !nm.firstChild) return false;
+  const range = document.createRange();
+  range.selectNodeContents(nm);
+  return e.clientX > range.getBoundingClientRect().right + 6;
+}
+
+/* ---------- 拉框選取：在空白處按住左鍵拖曳，框到的項目都選取（按住 Ctrl＝加選／反選） ---------- */
+function startMarquee(pane, e, rowIdx) {
+  e.preventDefault();                       // 不啟動 HTML5 拖曳、不選取文字
+  setActive(pane);
+  pane.pendingSingle = null;
+  const t = tabOf(pane), list = pane.dom.list;
+  const add = e.ctrlKey || e.metaKey;
+  const base = add ? new Set(t.sel) : new Set();
+  const pos = ev => {
+    const lr = list.getBoundingClientRect();
+    return { x: clamp(ev.clientX - lr.left, 0, list.clientWidth), y: clamp(ev.clientY - lr.top, 0, list.clientHeight) + list.scrollTop };
+  };
+  const p0 = pos(e);
+  let lastEv = e, moved = false, raf = 0;
+  const box = el('div', { class: 'marquee' });
+
+  const update = () => {
+    raf = 0;
+    const p1 = pos(lastEv);
+    if (!moved && Math.abs(p1.x - p0.x) < 4 && Math.abs(p1.y - p0.y) < 4) return;   // 還沒真正拖動
+    if (!moved) { moved = true; list.appendChild(box); }
+    const x = Math.min(p0.x, p1.x), y = Math.min(p0.y, p1.y), w = Math.abs(p1.x - p0.x), hh = Math.abs(p1.y - p0.y);
+    Object.assign(box.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: hh + 'px' });
+    const h = S.rowH, n = t.view.length;
+    const i0 = Math.floor(y / h), i1 = Math.min(n - 1, Math.floor((y + hh) / h));
+    const sel = new Set(base);
+    for (let i = i0; i <= i1; i++) {
+      const name = t.view[i].name;
+      if (add && base.has(name)) sel.delete(name); else sel.add(name);
+    }
+    t.sel = sel;
+    if (i0 <= i1) t.cursor = p1.y >= p0.y ? i1 : i0;
+    onSelChange();
+  };
+  const schedule = () => { if (!raf) raf = requestAnimationFrame(update); };
+
+  // 拖到清單上下邊緣時自動捲動
+  const scrollTimer = setInterval(() => {
+    const r = list.getBoundingClientRect(), y = lastEv.clientY, edge = 24;
+    let dy = 0;
+    if (y < r.top + edge) dy = -Math.ceil((r.top + edge - y) / 3);
+    else if (y > r.bottom - edge) dy = Math.ceil((y - r.bottom + edge) / 3);
+    if (dy && moved) { list.scrollTop += dy; schedule(); }
+  }, 30);
+
+  const onMove = ev => { lastEv = ev; schedule(); };
+  const onUp = ev => {
+    window.removeEventListener('mousemove', onMove, true);
+    window.removeEventListener('mouseup', onUp, true);
+    clearInterval(scrollTimer);
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    lastEv = ev;
+    update();
+    box.remove();
+    if (moved) {
+      t.anchor = clamp(Math.floor(p0.y / S.rowH), 0, Math.max(0, t.view.length - 1));
+      return;
+    }
+    // 沒有拖動：當成一般點擊
+    if (rowIdx >= 0 && t.view[rowIdx]) {
+      const name = t.view[rowIdx].name;
+      if (add) { if (t.sel.has(name)) t.sel.delete(name); else t.sel.add(name); }
+      else t.sel = new Set([name]);
+      t.anchor = t.cursor = rowIdx;
+    } else if (!add) {
+      t.sel = new Set(); t.anchor = -1;
+    }
+    onSelChange();
+  };
+  window.addEventListener('mousemove', onMove, true);
+  window.addEventListener('mouseup', onUp, true);
 }
 
 function rowClick(pane, e) {
@@ -916,7 +1010,8 @@ async function onListContextMenu(pane, e) {
   }
   const paths = ents.map(x => fullPath(t, x));
   const target = ents.length === 1 && ents[0].isDir ? ents[0] : null;
-  const canPaste = !!S.clip && t.path !== '';
+  await syncClipboard();
+  const canPaste = (!!S.clip || S.sysClip) && t.path !== '';
 
   ctxBusy = true;
   let act = '';
@@ -950,7 +1045,7 @@ async function runMenuAction(act, pane, target) {
 
 function showFallbackMenu(x, y, pane, ents) {
   const t = tabOf(pane), root = t.path === '', n = ents.length;
-  const paste = !!S.clip && !root;
+  const paste = (!!S.clip || S.sysClip) && !root;
   const defs = n ? [
     ['開啟', ACT.open, n === 1],
     null,
@@ -1050,6 +1145,9 @@ function clipSet(mode) {
   const r = needItems();
   if (!r) return;
   S.clip = { mode, dir: r.t.path, names: new Set(r.ents.map(e => e.name)), paths: r.ents.map(e => fullPath(r.t, e)) };
+  S.sysClip = true;
+  // 同時放到系統剪貼簿，讓檔案總管等其他程式也能貼上
+  api.SetClipboard(S.clip.paths, mode === 'cut').catch(err => console.warn('[警告] 寫入系統剪貼簿失敗', err));
   toast(`已${mode === 'copy' ? '複製' : '剪下'} ${r.ents.length} 項`);
   S.panes.forEach(p => paintRows(p));
   updateSide();
@@ -1058,12 +1156,38 @@ function clipSet(mode) {
 async function doPaste(dstDir) {
   const t = curTab();
   const dst = typeof dstDir === 'string' ? dstDir : t.path;     // 右鍵按在資料夾上時，貼到該資料夾內
-  if (!S.clip) { toast('剪貼簿是空的', 'err'); return; }
   if (dst === '') { toast('請先進入磁碟機或資料夾', 'err'); return; }
+  await syncClipboard();            // 以系統剪貼簿為準（可能是在檔案總管或系統右鍵選單複製的）
+  if (!S.clip) { toast('剪貼簿是空的', 'err'); return; }
   const clip = S.clip;
-  // 剪下：排入佇列後就清掉剪貼簿，避免同一批檔案被重複移動
-  const clearCut = () => { if (clip.mode === 'cut' && S.clip === clip) { S.clip = null; S.panes.forEach(p => paintRows(p)); updateSide(); } };
+  // 剪下：排入佇列後就清掉剪貼簿（含系統剪貼簿），避免同一批檔案被重複移動
+  const clearCut = () => {
+    if (clip.mode !== 'cut' || S.clip !== clip) return;
+    S.clip = null; S.sysClip = false;
+    api.ClearClipboard().catch(() => {});
+    S.panes.forEach(p => paintRows(p)); updateSide();
+  };
   await transfer(clip.mode === 'cut' ? 'move' : 'copy', clip.paths, dst, { onQueued: clearCut });
+}
+
+// 與系統剪貼簿同步：系統剪貼簿有檔案且與程式內剪貼簿不同時，改用系統剪貼簿的內容
+const samePaths = (a, b) => a.length === b.length && a.every((p, i) => p.toLowerCase() === b[i].toLowerCase());
+async function syncClipboard() {
+  let c;
+  try { c = await api.GetClipboard(); } catch (e) { console.warn('[警告] 讀取系統剪貼簿失敗', e); return; }
+  const paths = (c && c.paths) || [];
+  S.sysClip = paths.length > 0;
+  if (!paths.length) {
+    if (S.clip) { S.clip = null; S.panes.forEach(p => paintRows(p)); }    // 其他程式已複製了別的東西
+    updateSide();
+    return;
+  }
+  const mode = c.cut ? 'cut' : 'copy';
+  if (S.clip && S.clip.mode === mode && samePaths(S.clip.paths, paths)) return;
+  const dir = dirOf(paths[0]);
+  S.clip = { mode, dir, names: new Set(paths.filter(p => dirOf(p).toLowerCase() === dir.toLowerCase()).map(baseName)), paths };
+  S.panes.forEach(p => paintRows(p));
+  updateSide();
 }
 
 function toOther(mode) {
@@ -1302,18 +1426,38 @@ async function revealSel() {
   try { await api.Reveal(p); } catch (e) { toast(errMsg(e), 'err'); }
 }
 
-async function calcSize() {
-  const t = curTab(), key = selKey(t);
-  const paths = selPaths(t);
-  if (!paths.length) return;
-  S.calc = { key, text: '計算中…' };
+// 子資料夾大小快取：完整路徑 → 位元組數（重新整理清單後仍保留，重新計算時覆蓋）
+const DIR_SIZES = new Map();
+const dirSizeOf = (t, e) => (e.isDir && t.path !== '' ? DIR_SIZES.get(fullPath(t, e)) : undefined);
+const sizeOf = (t, e) => (e.isDir ? (dirSizeOf(t, e) ?? -1) : e.size);   // 未計算的資料夾排在最小
+
+// 一次計算目前資料夾內所有子資料夾的大小，逐一更新「大小」欄
+async function calcDirSizes() {
+  const pane = S.panes[S.active], t = tabOf(pane);
+  if (t.path === '') { toast('請先進入一個資料夾', 'err'); return; }
+  if (S.calc) { toast('正在計算中，請稍候', 'err'); return; }
+  const dirs = t.entries.filter(e => e.isDir && (S.set.hidden || !e.hidden));
+  if (!dirs.length) { toast('這個資料夾沒有子資料夾'); return; }
+  const base = t.path;
+  S.calc = { path: base, done: 0, total: dirs.length };
   updateSide();
-  try {
-    const sz = await api.CalcSize(paths);
-    const selDirs = selectedEntries(t).filter(e => e.isDir).length;     // Measure 的資料夾數包含選取的資料夾本身
-    if (S.calc && S.calc.key === key) S.calc.text = `總計 ${fmtSize(sz.bytes)}（${sz.files} 個檔案、${Math.max(0, sz.folders - selDirs)} 個子資料夾）`;
-  } catch (e) { S.calc = null; toast(errMsg(e), 'err'); }
+  let failed = 0;
+  for (const e of dirs) {
+    const p = joinPath(base, e.name);
+    try {
+      const sz = await api.CalcSize([p]);
+      DIR_SIZES.set(p, sz.bytes);
+    } catch (err) {
+      failed++;
+      console.warn('[警告] 計算資料夾大小失敗', p, err);
+    }
+    S.calc.done++;
+    S.panes.forEach(pn => { const tt = tabOf(pn); if (tt.path === base) { if (tt.sort.key === 'size') rebuildView(tt); renderRows(pn); } });
+    updateSide();
+  }
+  S.calc = null;
   updateSide();
+  toast(`已計算 ${dirs.length - failed} 個子資料夾的大小` + (failed ? `，${failed} 個無法讀取` : ''), failed ? 'err' : '');
 }
 
 /* ---------- 批次改名 ---------- */
@@ -1650,7 +1794,7 @@ const ACT = {
   deletePerm: deletePermSel,
   reveal: revealSel,
   copyPath,
-  calc: calcSize,
+  calcDirs: calcDirSizes,
   newTab: () => addTab(curPane()),
   swapPanes,
   resetSplit() { setSplit(0.5); savePrefs(); },
@@ -1717,8 +1861,7 @@ function updateSide() {
   const other = S.set.dual ? tabOf(otherPane()) : null;
 
   // 選取資訊卡
-  const title = $('#selTitle'), meta = $('#selMeta'), calc = $('#btnCalc');
-  const hasDir = ents.some(e => e.isDir) && !isRoot;
+  const title = $('#selTitle'), meta = $('#selMeta');
   if (n === 0) {
     title.textContent = baseName(t.path) || '本機';
     meta.textContent = `${t.view.length} 個項目，尚未選取`;
@@ -1726,17 +1869,15 @@ function updateSide() {
     const e = ents[0];
     title.textContent = e.name;
     meta.textContent = isRoot ? (e.label || '磁碟機')
-      : `${e.isDir ? '資料夾' : (extOf(e.name) ? extOf(e.name).toUpperCase() + ' 檔案' : '檔案')}｜${e.isDir ? '大小未計算' : fmtSize(e.size)}｜${fmtDate(e.mod)}`;
+      : `${e.isDir ? '資料夾' : (extOf(e.name) ? extOf(e.name).toUpperCase() + ' 檔案' : '檔案')}｜${e.isDir ? (dirSizeOf(t, e) != null ? fmtSize(dirSizeOf(t, e)) : '大小未計算') : fmtSize(e.size)}｜${fmtDate(e.mod)}`;
   } else {
     const files = ents.filter(e => !e.isDir);
     title.textContent = `已選取 ${n} 項`;
     meta.textContent = `${files.length} 個檔案、${n - files.length} 個資料夾｜檔案合計 ${fmtSize(files.reduce((s, e) => s + e.size, 0))}`;
   }
-  const key = selKey(t);
-  if (S.calc && S.calc.key !== key) S.calc = null;
-  calc.hidden = !hasDir;
-  calc.textContent = S.calc ? S.calc.text : '計算資料夾大小';
-  calc.disabled = !!S.calc && S.calc.text === '計算中…';
+  const cd = $('#b-calcDirs');
+  cd.textContent = S.calc ? `計算中… ${S.calc.done}／${S.calc.total}` : '計算所有子資料夾大小';
+  cd.disabled = !!S.calc || isRoot;
 
   const set = (id, enabled) => { const b = $('#b-' + id); if (b) b.disabled = !enabled; };
   set('back', t.hi > 0);
@@ -1749,7 +1890,7 @@ function updateSide() {
   set('newfile', !isRoot);
   set('copy', n >= 1 && !isRoot);
   set('cut', n >= 1 && !isRoot);
-  set('paste', !!S.clip && !isRoot);
+  set('paste', (!!S.clip || S.sysClip) && !isRoot);
   set('copyOther', n >= 1 && !isRoot && !!other && other.path !== '');
   set('moveOther', n >= 1 && !isRoot && !!other && other.path !== '');
   set('trash', n >= 1 && !isRoot);
@@ -2038,6 +2179,7 @@ async function init() {
     last = Date.now();
     refreshAll({ keepSel: true, quiet: true });
     refreshLocations();
+    syncClipboard();     // 在其他程式複製或剪下的檔案
   };
   window.addEventListener('focus', onFocus);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) onFocus(); });

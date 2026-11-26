@@ -185,6 +185,31 @@ func (a *App) StartDrag(paths []string) (string, error) {
 	return eff, logErr("原生拖曳", err)
 }
 
+// ClipboardFiles 是系統剪貼簿中的檔案清單。
+type ClipboardFiles struct {
+	Paths []string `json:"paths"`
+	Cut   bool     `json:"cut"` // true：來源標示為「剪下」
+}
+
+// SetClipboard 把檔案放到系統剪貼簿（程式內複製／剪下時呼叫，讓檔案總管也能貼上）。
+func (a *App) SetClipboard(paths []string, cut bool) error {
+	return logErr("寫入系統剪貼簿", fsops.SetClipboardFiles(paths, cut))
+}
+
+// GetClipboard 讀取系統剪貼簿中的檔案（例如在檔案總管或系統右鍵選單複製的檔案）。
+func (a *App) GetClipboard() (ClipboardFiles, error) {
+	p, cut, err := fsops.GetClipboardFiles()
+	if p == nil {
+		p = []string{}
+	}
+	return ClipboardFiles{Paths: p, Cut: cut}, logErr("讀取系統剪貼簿", err)
+}
+
+// ClearClipboard 清空系統剪貼簿（剪下並貼上後呼叫）。
+func (a *App) ClearClipboard() error {
+	return logErr("清空系統剪貼簿", fsops.ClearClipboard())
+}
+
 // ListDir 列出資料夾內容；path 為空字串代表「本機」（磁碟機清單）。
 func (a *App) ListDir(path string) (*fsops.Listing, error) {
 	l, err := fsops.ListDir(path)
