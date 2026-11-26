@@ -78,6 +78,10 @@ export function ShellMenu(arg1, arg2, arg3) {
   return window['go']['main']['App']['ShellMenu'](arg1, arg2, arg3);
 }
 
+export function StartDrag(arg1) {
+  return window['go']['main']['App']['StartDrag'](arg1);
+}
+
 export function Trash(arg1) {
   return window['go']['main']['App']['Trash'](arg1);
 }

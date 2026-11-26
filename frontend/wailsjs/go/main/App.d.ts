@@ -41,6 +41,8 @@ export function Reveal(arg1:string):Promise<void>;
 
 export function ShellMenu(arg1:string,arg2:Array<string>,arg3:boolean):Promise<string>;
 
+export function StartDrag(arg1:Array<string>):Promise<string>;
+
 export function Trash(arg1:Array<string>):Promise<void>;
 
 export function UnpinQuick(arg1:string):Promise<void>;

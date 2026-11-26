@@ -177,6 +177,14 @@ func (a *App) ShellMenu(dir string, paths []string, canPaste bool) (string, erro
 	return act, logErr("系統右鍵選單", err)
 }
 
+// StartDrag 以 Windows 原生拖放拖曳檔案（可拖到檔案總管、桌面、瀏覽器上傳區等），放開滑鼠後才回傳。
+// 回傳：空字串＝取消；move／copy／link＝目的地採用的效果；none＝放在不接受的位置。
+func (a *App) StartDrag(paths []string) (string, error) {
+	log.Printf("[執行] 原生拖曳：%d 項", len(paths))
+	eff, err := fsops.StartFileDrag(paths)
+	return eff, logErr("原生拖曳", err)
+}
+
 // ListDir 列出資料夾內容；path 為空字串代表「本機」（磁碟機清單）。
 func (a *App) ListDir(path string) (*fsops.Listing, error) {
 	l, err := fsops.ListDir(path)

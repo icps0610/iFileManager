@@ -524,6 +524,9 @@ func hostWndProc(hwnd, msg, wp, lp uintptr) uintptr {
 	case wmShowMenu:
 		runPending(hwnd)
 		return 0
+	case wmDoDrag:
+		runPendingDrag(hwnd)
+		return 0
 	case wmInitMenuPop, wmDrawItem, wmMeasureItem, wmMenuChar:
 		if currentMenu != nil {
 			if res, ok := currentMenu.handleMsg(uint32(msg), wp, lp); ok {

@@ -1448,8 +1448,28 @@ function rowDragStart(pane, e) {
   if (!t.sel.has(ent.name)) { t.sel = new Set([ent.name]); t.anchor = t.cursor = +row.dataset.i; onSelChange(); }
   pane.pendingSingle = null;
   dragData = { pane, dir: t.path, paths: selPaths(t), names: new Set(t.sel) };
+  if (!nativeDragging) { e.preventDefault(); startNativeDrag(dragData); return; }   // 上一次原生拖曳還沒結束時改用程式內拖曳
   e.dataTransfer.effectAllowed = 'copyMove';
   e.dataTransfer.setData('text/plain', dragData.paths.join('\n'));
+}
+
+// 原生拖放：由後端呼叫 Windows DoDragDrop，可拖到檔案總管、桌面、瀏覽器上傳區等。
+// 拖回本程式的窗格時，WebView2 一樣會觸發 dragover／drop，交給 dragOver／dropOn 處理（dragData 仍有效）。
+let nativeDragging = false;
+async function startNativeDrag(data) {
+  if (nativeDragging) return;
+  nativeDragging = true;
+  try {
+    const eff = await api.StartDrag(data.paths);
+    console.info('[資訊] 原生拖曳結束', eff || '取消');
+    if (eff === 'move' || eff === 'copy') refreshAll({ keepSel: true, quiet: true });   // 拖到外部程式時，對方可能已移動或複製檔案
+  } catch (err) {
+    console.warn('[警告] 原生拖曳失敗', err);
+    toast('拖曳失敗：' + (err && err.message ? err.message : err), 'err');
+  } finally {
+    nativeDragging = false;
+    if (dragData === data) dragEnd();
+  }
 }
 
 function dropTargetOf(pane, e) {
@@ -1473,6 +1493,7 @@ function dragOver(pane, e) {
   const tgt = dropTargetOf(pane, e);
   if (tgt.path === '') return;
   e.preventDefault();
+  e.stopPropagation();   // 不讓下方 window 的保護處理把游標改成「不可放下」
   e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move';
   clearDropMarks();
   if (tgt.row) tgt.row.classList.add('drop'); else pane.dom.root.classList.add('dropzone');
@@ -1912,7 +1933,7 @@ async function init() {
   if (prefs.set) S.set = { ...S.set, ...prefs.set };
   S.set.dual = false;          // 每次啟動都只顯示一個窗格，需要時再按「＋ 第二窗格」開啟（第二窗格的分頁、欄位設定仍會保留）
   const oldCols = S.set.cols, oldNameW = S.set.nameW;     // 舊版是兩窗格共用的設定：當成兩邊的預設值後移除
-  delete S.set.cols; delete S.set.nameW;
+  delete S.set.cols; delete S.set.nameW; delete S.set.nativeDrag;   // nativeDrag：已移除的「拖到其他程式」開關
   applyTheme(); applyFont();
 
   if (!(await waitForApi())) {
@@ -1923,6 +1944,9 @@ async function init() {
     window.runtime.EventsOn('op:progress', p => { if (onProgress) onProgress(p); });
     window.runtime.EventsOn('drives:changed', onDrivesChanged);
   }
+  // 檔案拖到窗格以外的地方（或從外部拖進來）時，避免 WebView 直接開啟該檔案
+  window.addEventListener('dragover', e => { if (!e.defaultPrevented) { e.preventDefault(); e.dataTransfer.dropEffect = 'none'; } });
+  window.addEventListener('drop', e => { if (!e.defaultPrevented) e.preventDefault(); });
 
   S.boot = await api.Bootstrap();
   const home = S.boot.home || '';
