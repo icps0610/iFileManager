@@ -4,6 +4,8 @@
 
 Windows 雙窗格檔案管理工具，介面為繁體中文。
 
+<img width="1431" height="844" alt="iFileManager 截圖" src="https://github.com/user-attachments/assets/e90770fd-5db3-456c-91f8-d9e0e77ad6bc" />
+
 ## 系統需求
 - Windows 10 以上
 - [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)（Windows 11 已內建；若啟動時出現 WebView2 相關錯誤，請先安裝）
