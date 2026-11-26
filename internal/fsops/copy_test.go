@@ -83,11 +83,11 @@ func TestCopyPolicies(t *testing.T) {
 	}
 	// 保留兩者
 	res = mustCopy(t, []string{src}, dstDir, PolicyKeepBoth)
-	if res.OK != 1 || read(t, filepath.Join(dstDir, "f - 複本.txt")) != "NEW" || read(t, filepath.Join(dstDir, "f.txt")) != "OLD" {
+	if res.OK != 1 || read(t, filepath.Join(dstDir, "f_BK1.txt")) != "NEW" || read(t, filepath.Join(dstDir, "f.txt")) != "OLD" {
 		t.Errorf("保留兩者策略錯誤：%+v", res)
 	}
 	res = mustCopy(t, []string{src}, dstDir, PolicyKeepBoth)
-	if read(t, filepath.Join(dstDir, "f - 複本 (2).txt")) != "NEW" {
+	if read(t, filepath.Join(dstDir, "f_BK2.txt")) != "NEW" {
 		t.Errorf("第二份複本命名錯誤：%+v", res)
 	}
 	// 覆寫
@@ -120,7 +120,7 @@ func TestCopySameDirKeepsBoth(t *testing.T) {
 		t.Error("應偵測為同資料夾")
 	}
 	res := mustCopy(t, []string{f}, dir, PolicyOverwrite) // 即使指定覆寫也必須保留兩者，避免自己覆蓋自己
-	if res.OK != 1 || read(t, filepath.Join(dir, "a - 複本.txt")) != "X" || read(t, f) != "X" {
+	if res.OK != 1 || read(t, filepath.Join(dir, "a_BK1.txt")) != "X" || read(t, f) != "X" {
 		t.Errorf("同資料夾複製錯誤：%+v", res)
 	}
 }
@@ -323,13 +323,13 @@ func TestDeletePermanent(t *testing.T) {
 func TestUniqueNameDotfileAndDir(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, ".gitignore"), "x")
-	if got := filepath.Base(uniqueName(filepath.Join(dir, ".gitignore"), false)); got != ".gitignore - 複本" {
+	if got := filepath.Base(uniqueName(filepath.Join(dir, ".gitignore"), false)); got != ".gitignore_BK1" {
 		t.Errorf("dotfile 命名錯誤：%q", got)
 	}
 	if err := os.Mkdir(filepath.Join(dir, "v1.2"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if got := filepath.Base(uniqueName(filepath.Join(dir, "v1.2"), true)); got != "v1.2 - 複本" {
+	if got := filepath.Base(uniqueName(filepath.Join(dir, "v1.2"), true)); got != "v1.2_BK1" {
 		t.Errorf("資料夾命名錯誤：%q", got)
 	}
 }

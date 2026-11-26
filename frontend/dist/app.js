@@ -1089,7 +1089,7 @@ function chooseConflict(names, mode) {
   const ul = el('ul', { class: 'namelist' });
   names.slice(0, 6).forEach(n => ul.append(el('li', null, n)));
   if (names.length > 6) ul.append(el('li', null, `…另有 ${names.length - 6} 項`));
-  m.body.append(ul, el('div', { class: 'hint' }, '取代：以新的覆蓋舊的（資料夾會合併）。保留兩者：新的自動加上「- 複本」。'));
+  m.body.append(ul, el('div', { class: 'hint' }, '取代：以新的覆蓋舊的（資料夾會合併）。保留兩者：新的自動改名為「原檔名_BK數字」。'));
   return m.result;
 }
 

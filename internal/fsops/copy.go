@@ -204,7 +204,7 @@ func CheckConflicts(srcs []string, dstDir string) ConflictInfo {
 	return ci
 }
 
-// uniqueName 產生不與現有項目衝突的名稱：「名稱 - 複本.ext」、「名稱 - 複本 (2).ext」…
+// uniqueName 產生不與現有項目衝突的名稱：「名稱_BK1.ext」、「名稱_BK2.ext」…（資料夾為「名稱_BK1」）
 func uniqueName(path string, isDir bool) string {
 	dir, name := filepath.Dir(path), filepath.Base(path)
 	ext := ""
@@ -216,11 +216,7 @@ func uniqueName(path string, isDir bool) string {
 	}
 	base := strings.TrimSuffix(name, ext)
 	for i := 1; ; i++ {
-		suffix := " - 複本"
-		if i > 1 {
-			suffix = fmt.Sprintf(" - 複本 (%d)", i)
-		}
-		cand := filepath.Join(dir, base+suffix+ext)
+		cand := filepath.Join(dir, fmt.Sprintf("%s_BK%d%s", base, i, ext))
 		if !exists(cand) {
 			return cand
 		}
