@@ -15,7 +15,6 @@ Windows 雙窗格檔案管理工具，介面為繁體中文。
 - 「刪除」會移到資源回收筒；「永久刪除」無法復原，請確認後再執行
 - 網路磁碟或離線的路徑讀取可能較慢
 - 執行檔若經過壓縮，少數防毒軟體可能誤判，可將其加入例外
-- 遇到問題時，請附上記錄檔 `%LOCALAPPDATA%\iFileManager\fm.log`
 
 ## 功能
 
@@ -88,3 +87,57 @@ Windows 雙窗格檔案管理工具，介面為繁體中文。
 | Esc | 取消選取；沒有選取時清除篩選 |
 | ↑ ↓ PageUp PageDown Home End | 移動游標，搭配 Shift 可連續選取 |
 | Ctrl+＋ ／ Ctrl+－ ／ Ctrl+0 | 放大／縮小／還原字級 |
+
+---
+
+## 開發
+
+以 Go 與 [Wails v2](https://wails.io/) 開發。
+
+### 開發環境
+- Windows 10 以上、WebView2 Runtime
+- [Go](https://go.dev/dl/) 1.27 以上（目前以 Go 1.27.4 建置；go.mod 為 `go 1.27`，module 名稱 `ifilemanager`）
+- Wails CLI v2（build.bat 會在找不到時自動安裝）
+- 選用：[UPX](https://upx.github.io/)，加入 PATH 後 build.bat 會自動壓縮執行檔
+- 首次建置需要網路（安裝 Wails CLI、下載相依套件）
+- 版本號在 `wails.json` 的 `info.productVersion`
+
+### 建置
+在專案資料夾執行：
+
+```bat
+build.bat
+```
+
+腳本會依序：
+1. 檢查 Go，未安裝 Wails CLI 時自動安裝
+2. 執行 `go mod tidy`
+3. 執行單元測試 `go test ./internal/...`，未通過即停止
+4. 執行系統功能自我檢測（右鍵選單、快速存取、磁碟），未通過只顯示警告、仍繼續建置
+5. 關閉執行中的 iFileManager（`taskkill /f /im iFileManager.exe`）
+6. 執行 `wails build -clean -ldflags "-s -w"`
+7. 若有安裝 UPX，執行 `upx --best --lzma` 壓縮執行檔（未安裝則略過；壓縮後可能被部分防毒誤判）
+
+完成後輸出檔為 `build\bin\iFileManager.exe`。
+
+### 記錄檔
+執行記錄寫在 `%LOCALAPPDATA%\iFileManager\fm.log`，超過 1MB 時會清空重新記錄。
+
+快速存取透過 PowerShell 讀取；程式啟動時會在背景預先讀取，記錄檔會寫入耗時，讀不到時前端會重試並沿用上次成功的清單。
+
+### 專案結構
+
+| 路徑 | 說明 |
+| --- | --- |
+| `main.go` | 程式進入點、視窗設定 |
+| `app.go` | 提供給前端呼叫的後端 API、磁碟變更偵測、記錄檔 |
+| `fatal_*.go` | 啟動失敗時顯示錯誤訊息 |
+| `internal/fsops/` | 檔案操作核心：列目錄、複製／移動、批次改名、資源回收筒、右鍵選單、快速存取 |
+| `frontend/dist/` | 前端介面（HTML、CSS、JavaScript，不需額外建置） |
+| `frontend/wailsjs/` | Wails 自動產生的前端綁定 |
+| `build/` | 圖示、Windows 資訊檔與建置輸出 |
+| `build.bat` | 建置腳本 |
+
+### Git
+- `.gitignore`：`build/bin/`、`backup_*/`、`.bak_*/`
+- 平常修改不另外備份；需要時才備份到 `backup_last`
