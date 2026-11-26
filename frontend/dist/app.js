@@ -1,4 +1,4 @@
-/* ===== 檔案管理：前端 ===== */
+/* ===== iFileManager：前端 ===== */
 /* 後端方法由 Wails 注入在 window.go.main.App；開發預覽時由 dev/mock.js 模擬。 */
 'use strict';
 (() => {
@@ -1889,7 +1889,7 @@ async function init() {
   applyTheme(); applyFont();
 
   if (!(await waitForApi())) {
-    document.body.textContent = '無法連線到後端（找不到 window.go）。請以 FileManager.exe 開啟。';
+    document.body.textContent = '無法連線到後端（找不到 window.go）。請以 iFileManager.exe 開啟。';
     return;
   }
   if (window.runtime && window.runtime.EventsOn) {
@@ -1957,6 +1957,13 @@ async function init() {
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !setPanel.hidden && modalCount === 0) { e.preventDefault(); e.stopPropagation(); showSettings(false); }
   }, true);
+  // 磁碟、快速存取：點標題收合／展開，狀態存在 S.set.closed（drives、quick）
+  $$('#side [data-fold]').forEach(h => {
+    const key = h.dataset.fold, box = $('#' + key);
+    const apply = () => { const c = !!S.set.closed[key]; box.hidden = c; h.setAttribute('aria-expanded', String(!c)); };
+    apply();
+    h.addEventListener('click', () => { S.set.closed[key] = !S.set.closed[key]; apply(); savePrefs(); });
+  });
   $$('#side details').forEach(d => {
     if (S.set.closed[d.dataset.sec]) d.open = false;
     d.addEventListener('toggle', () => { S.set.closed[d.dataset.sec] = !d.open; savePrefs(); });

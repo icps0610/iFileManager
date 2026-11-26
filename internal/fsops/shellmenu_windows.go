@@ -491,7 +491,7 @@ func hostThread() {
 	procCoInitializeEx.Call(0, 0x2|0x4) // APARTMENTTHREADED | DISABLE_OLE1DDE
 
 	inst, _, _ := procGetModuleHandleW.Call(0)
-	cls, _ := syscall.UTF16PtrFromString("FileManagerShellMenuHost")
+	cls, _ := syscall.UTF16PtrFromString("iFileManagerShellMenuHost")
 	wc := wndClassEx{WndProc: syscall.NewCallback(hostWndProc), Instance: inst, ClassName: cls}
 	wc.Size = uint32(unsafe.Sizeof(wc))
 	if atom, _, e := procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc))); atom == 0 {

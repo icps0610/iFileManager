@@ -1,17 +1,17 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "FileManager",
-  "outputfilename": "FileManager",
+  "name": "iFileManager",
+  "outputfilename": "iFileManager",
   "frontend:dir": "frontend",
   "frontend:install": "",
   "frontend:build": "",
   "wailsjsdir": "frontend",
   "author": {
-    "name": "FileManager"
+    "name": "iFileManager"
   },
   "info": {
-    "productName": "檔案管理",
-    "productVersion": "0.1.0",
+    "productName": "iFileManager",
+    "productVersion": "0.9.0",
     "comments": "雙窗格、多分頁、批次改名、資源回收筒"
   }
 }

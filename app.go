@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"filemanager/internal/fsops"
+	"ifilemanager/internal/fsops"
 
 	wr "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -68,13 +68,13 @@ func (a *App) watchDrives(ctx context.Context) {
 	}
 }
 
-// initLog 把記錄寫到使用者快取資料夾（Windows 為 %LOCALAPPDATA%\FileManager\fm.log），超過 1MB 時重新開始。
+// initLog 把記錄寫到使用者快取資料夾（Windows 為 %LOCALAPPDATA%\iFileManager\fm.log），超過 1MB 時重新開始。
 func initLog() {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		return
 	}
-	dir = filepath.Join(dir, "FileManager")
+	dir = filepath.Join(dir, "iFileManager")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return
 	}

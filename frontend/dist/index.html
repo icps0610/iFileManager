@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>檔案管理</title>
+<title>iFileManager</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -18,7 +18,7 @@
 <aside id="side" aria-label="操作面板">
   <div class="side-head">
     <div class="brandrow">
-      <div class="brand">檔案管理</div>
+      <div class="brand">iFileManager</div>
       <!-- 重新整理：重新讀取磁碟、快速存取與所有窗格的檔案清單 -->
       <button class="iconbtn" id="b-reload" data-act="reloadAll" type="button" title="重新整理（磁碟、快速存取與檔案清單）" aria-label="重新整理"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
@@ -46,24 +46,14 @@
 
   <details open data-sec="places">
     <summary>位置</summary>
-    <div class="subhead first">磁碟</div>
+    <button class="subhead first fold" type="button" data-fold="drives" aria-controls="drives" aria-expanded="true">磁碟</button>
     <div class="drvlist" id="drives"></div>
     <div class="subrow">
-      <div class="subhead" id="quickHead">快速存取</div>
+      <button class="subhead fold" type="button" id="quickHead" data-fold="quick" aria-controls="quick" aria-expanded="true">快速存取</button>
       <!-- 釘選／取消釘選目前窗格所在的資料夾（Windows 快速存取） -->
       <button class="link" id="b-pin" data-act="togglePin" type="button">＋ 釘選目前資料夾</button>
     </div>
     <div class="grid g2" id="quick"></div>
-  </details>
-
-  <details open data-sec="nav">
-    <summary>導覽</summary>
-    <div class="grid g2">
-      <button class="btn" data-act="back" id="b-back">返回<small>Alt+←</small></button>
-      <button class="btn" data-act="forward" id="b-forward">前進<small>Alt+→</small></button>
-      <button class="btn" data-act="up" id="b-up">上一層<small>Backspace</small></button>
-      <button class="btn" data-act="refresh">重新整理<small>Ctrl+R</small></button>
-    </div>
   </details>
 
   <details open data-sec="ops">

@@ -3,11 +3,11 @@ setlocal EnableExtensions
 chcp 65001 >nul
 cd /d "%~dp0"
 
-echo [資訊] 檔案管理 建置腳本
+echo [資訊] iFileManager 建置腳本
 
 where go >nul 2>nul
 if errorlevel 1 (
-    echo [錯誤] 找不到 go，請先安裝 Go 1.24 以上版本：https://go.dev/dl/
+    echo [錯誤] 找不到 go，請先安裝 Go 1.27 以上版本：https://go.dev/dl/
     exit /b 1
 )
 for /f "delims=" %%v in ('go version') do echo [資訊] %%v
@@ -56,10 +56,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "build\bin\FileManager.exe" (
-    echo [錯誤] 找不到輸出檔 build\bin\FileManager.exe
+if not exist "build\bin\iFileManager.exe" (
+    echo [錯誤] 找不到輸出檔 build\bin\iFileManager.exe
     exit /b 1
 )
 
-echo [資訊] 建置完成：%CD%\build\bin\FileManager.exe
+echo [資訊] 建置完成：%CD%\build\bin\iFileManager.exe
 exit /b 0

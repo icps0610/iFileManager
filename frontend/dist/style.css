@@ -1,4 +1,4 @@
-/* ===== 檔案管理：樣式 ===== */
+/* ===== iFileManager：樣式 ===== */
 /* 所有尺寸皆用 rem，調整字級（右側面板的 A−／A+）時整個介面會等比例縮放。 */
 
 :root {
@@ -358,6 +358,11 @@ details:not([open]) summary { padding-bottom: .1rem; }
 details.first { border-top: 0; padding-top: 0; }
 .subhead { margin: .7rem 0 .35rem; font-size: .85rem; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
 .subhead.first { margin-top: .2rem; }
+/* 磁碟、快速存取標題：點擊收合／展開 */
+.subhead.fold { display: flex; align-items: center; gap: .3rem; background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer; text-align: left; }
+.subhead.fold::after { content: "▾"; font-weight: 400; }
+.subhead.fold[aria-expanded="false"]::after { content: "▸"; }
+.subhead.fold:hover { color: var(--accent); }
 .drvlist { display: flex; flex-direction: column; gap: .4rem; }
 .drv {
   display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; column-gap: .55rem; row-gap: .3rem;

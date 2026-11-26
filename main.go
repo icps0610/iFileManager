@@ -23,7 +23,7 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:            "檔案管理",
+		Title:            "iFileManager",
 		Width:            1440,
 		Height:           860,
 		MinWidth:         980,
@@ -36,6 +36,6 @@ func main() {
 	if err != nil {
 		printError(err)
 		logErr("啟動", err)
-		showFatal("無法啟動檔案管理：\n" + err.Error() + "\n\n若訊息與 WebView2 有關，請安裝 Microsoft Edge WebView2 Runtime。")
+		showFatal("無法啟動 iFileManager：\n" + err.Error() + "\n\n若訊息與 WebView2 有關，請安裝 Microsoft Edge WebView2 Runtime。")
 	}
 }

@@ -1,6 +1,6 @@
-module filemanager
+module ifilemanager
 
-go 1.26.0
+go 1.27
 
 require github.com/wailsapp/wails/v2 v2.17.1
 
