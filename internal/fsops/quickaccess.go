@@ -122,8 +122,9 @@ var qaCache struct {
 }
 
 const (
-	qaTTL    = 10 * time.Second // 成功結果的快取時間
-	qaErrTTL = 60 * time.Second // 失敗結果的快取時間，避免每次回到視窗都重跑失敗的 PowerShell
+	qaTTL     = 10 * time.Second // 成功結果的快取時間
+	qaErrTTL  = 15 * time.Second // 失敗結果的快取時間，避免每次回到視窗都重跑失敗的 PowerShell（太長會讓啟動時的一次失敗卡住很久）
+	qaTimeout = 20 * time.Second // 開機後第一次執行 PowerShell 可能很慢，逾時放寬
 )
 
 // QuickAccess 回傳 Windows「快速存取」的資料夾（已釘選者優先）。結果快取 10 秒。
@@ -141,7 +142,7 @@ func QuickAccess() ([]Place, error) {
 		qaCache.items, qaCache.err, qaCache.at = nil, err, time.Now()
 		return nil, err
 	}
-	out, err := runPowerShell(quickAccessScript, 10*time.Second)
+	out, err := runPowerShell(quickAccessScript, qaTimeout)
 	if err != nil {
 		return fail(err)
 	}
@@ -160,8 +161,10 @@ func QuickAccess() ([]Place, error) {
 			ok = append(ok, p)
 		}
 	}
-	if ok == nil {
-		ok = []Place{}
+	if len(ok) == 0 {
+		// 檔案總管剛啟動時快速存取可能還是空的：不快取，下次查詢再重新讀取
+		qaCache.items, qaCache.err, qaCache.at = nil, nil, time.Time{}
+		return []Place{}, nil
 	}
 	qaCache.items, qaCache.err, qaCache.at = ok, nil, time.Now()
 	return append([]Place(nil), ok...), nil

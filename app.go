@@ -38,6 +38,15 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	log.Printf("[資訊] 應用程式啟動（%s/%s）", runtime.GOOS, runtime.GOARCH)
 	go a.watchDrives(ctx)
+	// 啟動時先在背景讀取快速存取（PowerShell 冷啟動可能要好幾秒），前端第一次查詢時就能直接用快取
+	go func() {
+		t0 := time.Now()
+		if q, err := fsops.QuickAccess(); err != nil {
+			logErr("預先讀取快速存取", err)
+		} else {
+			log.Printf("[資訊] 預先讀取快速存取完成：%d 項，耗時 %v", len(q), time.Since(t0).Round(time.Millisecond))
+		}
+	}()
 }
 
 // DriveChange 是磁碟機插入／移除時送給前端的事件內容（事件名稱 drives:changed）。

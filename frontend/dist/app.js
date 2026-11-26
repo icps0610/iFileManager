@@ -1772,8 +1772,19 @@ function driveButton(d) {
     used != null ? el('span', { class: 'bar' }, el('i', { class: used >= 90 ? 'full' : '', style: `width:${used}%` })) : null);
 }
 
+// 上次成功讀到的系統快速存取：啟動時先顯示，等 PowerShell 讀完再更新（避免一開始只看到「常用資料夾」）
+const LS_QUICK = LS_KEY + '.quick';
+function loadQuickCache() {
+  try { const q = JSON.parse(localStorage.getItem(LS_QUICK)); return Array.isArray(q) && q.length ? q : null; } catch (e) { return null; }
+}
+function saveQuickCache(q) {
+  try { localStorage.setItem(LS_QUICK, JSON.stringify(q)); } catch (e) { /* 儲存失敗不影響使用 */ }
+}
+
 function buildPlaces() {
-  const loc = S.loc || { drives: S.boot.drives, quick: S.boot.places, quickFrom: 'fallback' };
+  const cq = S.loc ? null : loadQuickCache();
+  const loc = S.loc || (cq ? { drives: S.boot.drives, quick: cq, quickFrom: 'system' }
+                           : { drives: S.boot.drives, quick: S.boot.places, quickFrom: 'fallback' });
   $('#drives').replaceChildren(...(loc.drives || []).map(driveButton));
   const quick = loc.quick || [];
   const sys = loc.quickFrom === 'system';
@@ -1825,13 +1836,29 @@ function markPlaces() {
   updatePinBtn();
 }
 
-let locBusy = false, locAgain = false;
+let locBusy = false, locAgain = false, quickRetry = 0, quickRetryTimer = null;
+const QUICK_RETRY_MS = [3000, 8000, 20000];   // 讀不到系統快速存取時的重試間隔（開機後 PowerShell／檔案總管可能還沒準備好）
 async function refreshLocations(fresh) {
   if (locBusy) { locAgain = true; return; }   // 讀取中又有變更：結束後再讀一次，避免漏掉
   locBusy = true;
   try {
     const l = await (fresh ? api.RefreshLocations() : api.Locations());   // fresh：略過快取，重新向系統查詢
-    if (l && Array.isArray(l.drives)) { S.loc = l; buildPlaces(); }
+    if (l && Array.isArray(l.drives)) {
+      if (l.quickFrom === 'system') {
+        quickRetry = 0;
+        saveQuickCache(l.quick || []);
+      } else {
+        const cq = loadQuickCache();
+        if (cq) l.quick = cq, l.quickFrom = 'system';   // 暫時沿用上次的快速存取，不要退回「常用資料夾」
+        if (quickRetry < QUICK_RETRY_MS.length) {
+          const ms = QUICK_RETRY_MS[quickRetry++];
+          console.warn(`[警告] 讀不到系統快速存取，${ms / 1000} 秒後重試（第 ${quickRetry} 次）`);
+          clearTimeout(quickRetryTimer);
+          quickRetryTimer = setTimeout(() => refreshLocations(true), ms);
+        }
+      }
+      S.loc = l; buildPlaces();
+    }
   } catch (e) {
     console.warn('[警告] 讀取位置失敗', e);
   } finally {

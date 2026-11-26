@@ -49,8 +49,12 @@ if errorlevel 1 (
 )
 set "FM_SHELL_SMOKE="
 
-echo [執行] wails build -clean
-wails build -clean
+echo [執行] 關閉執行中的 iFileManager，避免輸出檔被鎖住
+taskkill /f /im iFileManager.exe >nul 2>nul
+if not errorlevel 1 timeout /t 1 /nobreak >nul
+
+echo [執行] wails build -clean -ldflags "-s -w"
+wails build -clean -ldflags "-s -w"
 if errorlevel 1 (
     echo [錯誤] wails build 失敗，請把上方訊息提供給我
     exit /b 1
@@ -61,5 +65,15 @@ if not exist "build\bin\iFileManager.exe" (
     exit /b 1
 )
 
+where upx >nul 2>nul
+if errorlevel 1 (
+    echo [警告] 找不到 upx，略過壓縮。需要縮小檔案時請安裝 UPX 並加入 PATH：https://upx.github.io/
+) else (
+    echo [執行] upx --best --lzma 壓縮執行檔；部分防毒軟體可能誤判 UPX 壓縮過的檔案
+    upx --best --lzma "build\bin\iFileManager.exe" >nul
+    if errorlevel 1 echo [警告] upx 壓縮失敗，保留未壓縮的執行檔
+)
+
+for %%F in ("build\bin\iFileManager.exe") do echo [資訊] 檔案大小：%%~zF bytes
 echo [資訊] 建置完成：%CD%\build\bin\iFileManager.exe
 exit /b 0
