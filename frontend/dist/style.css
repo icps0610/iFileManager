@@ -297,20 +297,27 @@ body.resizing.vresize, body.resizing.vresize * { cursor: row-resize !important; 
 .iconbtn:hover { color: var(--accent); border-color: var(--line); background: var(--hover); }
 .iconbtn.spin svg { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-/* 快速存取：標題列的釘選按鈕、項目上的取消釘選「×」 */
+/* 快速存取：標題列的釘選按鈕 */
 .subrow { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
 .subrow .link { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; font-size: .8rem; white-space: nowrap; }
 .subrow .link:hover:not(:disabled) { text-decoration: underline; }
 .subrow .link:disabled { color: var(--muted); opacity: .6; cursor: not-allowed; }
 .qitem { position: relative; min-width: 0; display: flex; }
 .qitem .btn { flex: 1; min-width: 0; }
-.qitem .qx {
-  position: absolute; top: 50%; right: .3rem; transform: translateY(-50%);
-  border: 0; border-radius: .4rem; background: var(--pane); color: var(--muted); cursor: pointer;
-  width: 1.5rem; height: 1.5rem; line-height: 1; font-size: 1rem; padding: 0; opacity: 0; transition: opacity .12s;
-}
-.qitem:hover .qx, .qitem .qx:focus-visible { opacity: 1; }
-.qitem .qx:hover { color: var(--danger); background: var(--danger-bg); }
+/* 快速存取編輯模式：筆的圖示、拖曳把手、移除按鈕 */
+.qhead { display: inline-flex; align-items: center; gap: .3rem; }
+.qedit { border: 0; background: none; color: var(--muted); cursor: pointer; padding: .1rem; width: 1.3rem; height: 1.3rem; border-radius: .35rem; display: inline-flex; }
+.qedit svg { width: 100%; height: 100%; }
+.qedit:hover { color: var(--accent); background: var(--hover); }
+.qeditbar { display: inline-flex; gap: .8rem; }
+.subrow .link.strong { font-weight: 700; }
+#quick.editing { grid-template-columns: 1fr; }
+.qrow { display: flex; align-items: center; gap: .4rem; min-width: 0; padding: .35rem .5rem; border: 1px dashed var(--line); border-radius: .6rem; background: var(--pane); user-select: none; touch-action: none; cursor: grab; }
+.qrow.dragging { cursor: grabbing; border-style: solid; border-color: var(--accent); box-shadow: 0 4px 14px rgba(0,0,0,.18); position: relative; z-index: 2; }
+.qrow .qgrip { color: var(--muted); flex: none; }
+.qrow .qname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qrow .qdel { border: 0; border-radius: .4rem; background: none; color: var(--muted); cursor: pointer; width: 1.5rem; height: 1.5rem; padding: 0; font-size: 1rem; flex: none; }
+.qrow .qdel:hover { color: var(--danger); background: var(--danger-bg); }
 .badge { font-size: .85rem; color: var(--accent); background: var(--accent-bg); border-radius: 2rem; padding: .1rem .7rem; white-space: nowrap; font-weight: 700; }
 
 .card { background: var(--bg); border-radius: .75rem; padding: .7rem .85rem; display: flex; flex-direction: column; gap: .25rem; }

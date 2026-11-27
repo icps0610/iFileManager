@@ -21,6 +21,8 @@ export function CreateFile(arg1:string,arg2:string):Promise<string>;
 
 export function DeletePermanent(arg1:Array<string>):Promise<fsops.Result>;
 
+export function EditQuick(arg1:Array<string>):Promise<void>;
+
 export function GetClipboard():Promise<main.ClipboardFiles>;
 
 export function ListDir(arg1:string):Promise<fsops.Listing>;

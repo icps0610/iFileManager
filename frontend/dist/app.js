@@ -918,6 +918,30 @@ function setCursor(i, extend) {
   onSelChange();
 }
 
+/* 仿 Windows 檔案總管：輸入字元跳到該字元開頭的項目。
+   1 秒內連續輸入視為前綴搜尋；重複按同一字元則在同字元開頭的項目間循環。 */
+const TYPE_SEL_MS = 1000;
+let typeBuf = '', typeAt = 0, typeTab = null;
+
+function typeSelect(ch) {
+  const pane = curPane(), t = tabOf(pane), n = t.view.length;
+  const now = Date.now();
+  if (now - typeAt > TYPE_SEL_MS || typeTab !== t) typeBuf = '';
+  if (!typeBuf && ch === ' ') return false;      // 空白只在前綴搜尋進行中才算字元
+  typeAt = now; typeTab = t;
+  typeBuf += ch.toLocaleLowerCase();
+  if (!n) return true;
+  const repeat = [...typeBuf].every(c => c === typeBuf[0]);
+  const needle = repeat ? typeBuf[0] : typeBuf;
+  // 單一字元或重複字元：從游標下一項開始找（循環）；多字元前綴：從游標本身開始找
+  const start = t.cursor < 0 ? 0 : (repeat ? t.cursor + 1 : t.cursor);
+  for (let k = 0; k < n; k++) {
+    const i = (start + k) % n;
+    if (t.view[i].name.toLocaleLowerCase().startsWith(needle)) { setCursor(i, false); return true; }
+  }
+  return true;                                    // 找不到就維持原位
+}
+
 window.addEventListener('keydown', ev => {
   if (modalCount > 0) return;
   const tag = ev.target.tagName;
@@ -972,7 +996,8 @@ window.addEventListener('keydown', ev => {
         if (t.sel.size) { t.sel = new Set(); onSelChange(); }
         else if (t.filter) { clearFilter(pane); syncFilter(pane); }
         break;
-      default: handled = false;
+      default:
+        handled = k.length === 1 && !ev.isComposing && typeSelect(k);
     }
   }
   if (handled) ev.preventDefault();
@@ -1780,6 +1805,9 @@ const ACT = {
     }
   },
   togglePin() { setPin(curTab().path, !$('#b-pin').dataset.pinned); },
+  qaEdit: qaEditStart,
+  qaDone: qaEditDone,
+  qaCancel: qaEditCancel,
   open: openSelected,
   rename: renameSel,
   batch: batchRename,
@@ -1950,11 +1978,26 @@ function buildPlaces() {
   $('#drives').replaceChildren(...(loc.drives || []).map(driveButton));
   const quick = loc.quick || [];
   const sys = loc.quickFrom === 'system';
-  // 系統快速存取的項目：滑鼠移上去會出現「×」可取消釘選
-  $('#quick').replaceChildren(...quick.map(p => el('div', { class: 'qitem' },
-    el('button', { class: 'btn line', 'data-nav': p.path, title: `${p.path}（Ctrl+點擊：在新分頁開啟）` }, el('span', null, p.name)),
-    sys ? el('button', { class: 'qx', type: 'button', 'data-unpin': p.path, title: `從快速存取取消釘選：${p.path}`, 'aria-label': '取消釘選' }, '×') : null)));
-  $('#quickHead').textContent = loc.quickFrom === 'system' ? '快速存取' : '常用資料夾';
+  const qbox = $('#quick');
+  if (S.qaEdit) {
+    // 編輯模式：拖曳把手排序、× 移除（按「完成」才同步到 Windows）
+    qbox.classList.add('editing');
+    qbox.replaceChildren(...S.qaEdit.items.map(p => el('div', { class: 'qrow', 'data-qpath': p.path, title: p.path },
+      el('span', { class: 'qgrip', 'aria-hidden': 'true' }, '≡'),
+      el('span', { class: 'qname' }, p.name),
+      el('button', { class: 'qdel', type: 'button', 'data-qdel': p.path, title: `移除：${p.path}`, 'aria-label': '移除' }, '×'))));
+  } else {
+    qbox.classList.remove('editing');
+    qbox.replaceChildren(...quick.map(p => el('div', { class: 'qitem' },
+      el('button', { class: 'btn line', 'data-nav': p.path, title: `${p.path}（Ctrl+點擊：在新分頁開啟）` }, el('span', null, p.name)))));
+  }
+  $('#quickHead').textContent = sys ? '快速存取' : '常用資料夾';
+  const editing = !!S.qaEdit;
+  $('#b-qaEdit').hidden = !sys || editing;
+  $('#qaEditBar').hidden = !editing;
+  $('#b-pin').hidden = editing;
+  $('#b-qaDone').disabled = !!(S.qaEdit && S.qaEdit.busy);
+  if (editing) qbox.hidden = false;     // 編輯時一定展開
   markPlaces();
 }
 
@@ -1968,6 +2011,92 @@ function updatePinBtn() {
   b.title = cur ? cur : '請先進入資料夾';
   b.disabled = !cur || S.pinBusy || !S.loc;
   b.dataset.pinned = pinned ? '1' : '';
+}
+
+/* ---------- 編輯快速存取：拖曳排序、移除，完成後同步到 Windows ---------- */
+function qaEditStart() {
+  const loc = S.loc;
+  if (!loc || loc.quickFrom !== 'system' || S.qaEdit) return;
+  const items = (loc.quick || []).map(p => ({ name: p.name, path: p.path }));
+  S.qaEdit = { items, orig: items.map(p => p.path), busy: false };
+  buildPlaces();
+}
+
+function qaEditCancel() {
+  if (!S.qaEdit || S.qaEdit.busy) return;
+  S.qaEdit = null;
+  buildPlaces();
+}
+
+async function qaEditDone() {
+  const ed = S.qaEdit;
+  if (!ed || ed.busy) return;
+  const order = ed.items.map(p => p.path);
+  if (samePaths(order, ed.orig)) { S.qaEdit = null; buildPlaces(); return; }
+  ed.busy = true;
+  $('#b-qaDone').textContent = '同步中…';
+  buildPlaces();
+  try {
+    await api.EditQuick(order);
+    toast('已同步到 Windows 快速存取');
+  } catch (e) {
+    console.error('[錯誤] 同步快速存取失敗', e);
+    toast(errMsg(e), 'err');
+  } finally {
+    $('#b-qaDone').textContent = '完成';
+    S.qaEdit = null;
+    await refreshLocations(true);
+    buildPlaces();
+  }
+}
+
+// 編輯模式下以滑鼠拖曳排序：拖動時直接搬移 DOM 節點，放開後依 DOM 順序更新 S.qaEdit.items
+function initQuickReorder() {
+  const box = $('#quick');
+  box.addEventListener('click', e => {
+    const del = e.target.closest('[data-qdel]');
+    if (!del || !S.qaEdit || S.qaEdit.busy) return;
+    e.stopPropagation();
+    S.qaEdit.items = S.qaEdit.items.filter(p => p.path !== del.dataset.qdel);
+    buildPlaces();
+  });
+  box.addEventListener('pointerdown', e => {
+    if (!S.qaEdit || S.qaEdit.busy || e.button !== 0) return;
+    const row = e.target.closest('.qrow');
+    if (!row || e.target.closest('[data-qdel]')) return;
+    e.preventDefault();
+    row.setPointerCapture(e.pointerId);
+    row.classList.add('dragging');
+    const startY = e.clientY;
+    const grabY = e.clientY - row.getBoundingClientRect().top;   // 游標在項目內的相對位置
+    let moved = false;
+    // 依游標位置直接算出插入點（可一次跨多格），項目本身用 transform 跟著游標走
+    const onMove = ev => {
+      if (!moved && Math.abs(ev.clientY - startY) < 3) return;
+      moved = true;
+      const centerY = ev.clientY - grabY + row.offsetHeight / 2;
+      const others = [...box.querySelectorAll('.qrow')].filter(r => r !== row);
+      const target = others.find(r => { const rc = r.getBoundingClientRect(); return centerY < rc.top + rc.height / 2; });
+      if (target) { if (row.nextElementSibling !== target) box.insertBefore(row, target); }
+      else if (box.lastElementChild !== row) box.append(row);
+      row.style.transform = '';
+      const top = row.getBoundingClientRect().top;
+      row.style.transform = `translateY(${ev.clientY - grabY - top}px)`;
+    };
+    const onUp = () => {
+      row.removeEventListener('pointermove', onMove);
+      row.removeEventListener('pointerup', onUp);
+      row.removeEventListener('pointercancel', onUp);
+      row.classList.remove('dragging');
+      row.style.transform = '';
+      if (!moved || !S.qaEdit) return;
+      const byPath = new Map(S.qaEdit.items.map(p => [p.path, p]));
+      S.qaEdit.items = [...box.querySelectorAll('.qrow')].map(r => byPath.get(r.dataset.qpath)).filter(Boolean);
+    };
+    row.addEventListener('pointermove', onMove);
+    row.addEventListener('pointerup', onUp);
+    row.addEventListener('pointercancel', onUp);
+  });
 }
 
 async function setPin(path, pin) {
@@ -2059,7 +2188,7 @@ function showHelp() {
     ['↑ ↓ / Shift+↑↓', '移動／連續選取'], ['Enter', '開啟'], ['Backspace', '上一層'], ['Alt+← / Alt+→', '返回／前進'],
     ['Tab', '切換左右窗格'], ['Ctrl+U', '左右窗格互換'], ['拖曳中間分隔線', '調整左右窗格寬度（雙擊平分）'], ['Ctrl+A', '全選'], ['Ctrl+C / X / V', '複製／剪下／貼上'], ['F5 / F6', '複製／移動到對面窗格'],
     ['F2', '重新命名'], ['F3', '批次改名'], ['F7 / Shift+F7', '新增資料夾／檔案'], ['Del', '移到資源回收筒'],
-    ['Shift+Del', '永久刪除'], ['Ctrl+T / Ctrl+W', '新增／關閉分頁'], ['Ctrl+L', '輸入路徑'], ['Ctrl+F', '篩選目前資料夾'],
+    ['Shift+Del', '永久刪除'], ['Ctrl+T / Ctrl+W', '新增／關閉分頁'], ['Ctrl+L', '輸入路徑'], ['Ctrl+F', '篩選目前資料夾'], ['輸入字母／數字', '跳到該字元開頭的項目（連打為前綴搜尋，重複按同一字元循環）'],
     ['Ctrl+R', '重新整理'], ['滑鼠右鍵', '開啟 Windows 系統選單（內容、傳送到、7-Zip 等）'], ['Ctrl + + / − / 0', '放大／縮小／還原字級'], ['拖曳檔案', '移動到另一窗格或資料夾（按住 Ctrl 為複製）'],
   ];
   const m = makeModal({ title: '快捷鍵', buttons: [{ label: '關閉', kind: 'primary', primary: true, cancel: true, value: true }] });
@@ -2111,6 +2240,7 @@ async function init() {
   applySplit();
 
   buildPlaces();
+  initQuickReorder();
   refreshLocations();          // 之後再讀取磁碟容量與系統的「快速存取」，不阻擋畫面顯示
   $('#fontbar').addEventListener('click', e => {
     const b = e.target.closest('[data-act]');
@@ -2124,8 +2254,6 @@ async function init() {
     if (c) cancelJob(+c.dataset.cancel);
   });
   $('#side').addEventListener('click', e => {
-    const un = e.target.closest('[data-unpin]');
-    if (un) { setPin(un.dataset.unpin, false); return; }
     const nav = e.target.closest('[data-nav]');
     if (nav) {
       const pane = curPane();

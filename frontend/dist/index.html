@@ -48,7 +48,15 @@
     <button class="subhead first fold" type="button" data-fold="drives" aria-controls="drives" aria-expanded="true">磁碟</button>
     <div class="drvlist" id="drives"></div>
     <div class="subrow">
-      <button class="subhead fold" type="button" id="quickHead" data-fold="quick" aria-controls="quick" aria-expanded="true">快速存取</button>
+      <span class="qhead">
+        <button class="subhead fold" type="button" id="quickHead" data-fold="quick" aria-controls="quick" aria-expanded="true">快速存取</button>
+        <!-- 編輯快速存取：拖曳排序、移除，按「完成」後同步到 Windows -->
+        <button class="qedit" type="button" id="b-qaEdit" data-act="qaEdit" title="編輯快速存取（拖曳排序、移除）" aria-label="編輯快速存取"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+      </span>
+      <span class="qeditbar" id="qaEditBar" hidden>
+        <button class="link" type="button" data-act="qaCancel">取消</button>
+        <button class="link strong" type="button" data-act="qaDone" id="b-qaDone">完成</button>
+      </span>
       <!-- 釘選／取消釘選目前窗格所在的資料夾（Windows 快速存取） -->
       <button class="link" id="b-pin" data-act="togglePin" type="button">＋ 釘選目前資料夾</button>
     </div>

@@ -38,6 +38,10 @@ export function DeletePermanent(arg1) {
   return window['go']['main']['App']['DeletePermanent'](arg1);
 }
 
+export function EditQuick(arg1) {
+  return window['go']['main']['App']['EditQuick'](arg1);
+}
+
 export function GetClipboard() {
   return window['go']['main']['App']['GetClipboard']();
 }

@@ -159,6 +159,12 @@ func (a *App) PinQuick(path string) error {
 	return nil
 }
 
+// EditQuick 依 order（保留的項目與新順序）同步 Windows「快速存取」：不在 order 裡的取消釘選，其餘依 order 重新排列。
+func (a *App) EditQuick(order []string) error {
+	log.Printf("[執行] 編輯快速存取：保留 %d 項", len(order))
+	return logErr("編輯快速存取", fsops.EditQuickAccess(order))
+}
+
 // UnpinQuick 把資料夾從 Windows「快速存取」取消釘選。
 func (a *App) UnpinQuick(path string) error {
 	log.Printf("[執行] 取消釘選快速存取：%s", path)

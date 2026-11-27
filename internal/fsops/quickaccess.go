@@ -265,3 +265,62 @@ for ($k = 0; $k -lt 10; $k++) { if (-not (IsPinned $p)) { 'ok'; exit }; Start-Sl
 'E_TIMEOUT'
 `)
 }
+
+// qaEditScript 依 $want（要保留的已釘選項目，依新順序）同步 Windows「快速存取」：
+//  1. 取消釘選不在 $want 裡的項目（刪除）
+//  2. Windows 沒有調整釘選順序的 API，而新釘選的項目一律排在最後；
+//     因此從第一個順序不同的位置起，把後面的項目全部取消釘選，再依新順序重新釘選。
+const qaEditScript = `function Pinned() {
+  $r = @()
+  foreach ($i in $sh.Namespace($qa).Items()) {
+    $pin = $false
+    try { $pin = [bool]$i.ExtendedProperty('System.IsPinnedToNameSpaceTree') } catch { }
+    if ($pin -and $i.Path) { $r += [string]$i.Path }
+  }
+  return ,$r
+}
+$wn = @($want | ForEach-Object { Norm $_ })
+foreach ($p in (Pinned)) {
+  if ($wn -notcontains (Norm $p)) {
+    $it = FindItem $p
+    if ($it) { $it.InvokeVerb('unpinfromhome') }
+    for ($t = 0; $t -lt 20 -and (IsPinned $p); $t++) { Start-Sleep -Milliseconds 100 }
+  }
+}
+$cur = Pinned
+$k = 0
+while ($k -lt $cur.Count -and $k -lt $want.Count -and (Norm $cur[$k]) -eq (Norm $want[$k])) { $k++ }
+for ($j = $k; $j -lt $cur.Count; $j++) {
+  $it = FindItem $cur[$j]
+  if ($it) { $it.InvokeVerb('unpinfromhome') }
+  for ($t = 0; $t -lt 20 -and (IsPinned $cur[$j]); $t++) { Start-Sleep -Milliseconds 100 }
+}
+for ($j = $k; $j -lt $want.Count; $j++) {
+  $f = $sh.Namespace($want[$j])
+  if (-not $f) { continue }
+  $f.Self.InvokeVerb('pintohome')
+  for ($t = 0; $t -lt 30 -and -not (IsPinned $want[$j]); $t++) { Start-Sleep -Milliseconds 100 }
+}
+'ok'
+`
+
+// EditQuickAccess 依 order（保留的項目與新順序）同步 Windows「快速存取」的釘選：不在 order 裡的取消釘選，其餘依 order 排列。
+func EditQuickAccess(order []string) error {
+	quoted := make([]string, 0, len(order))
+	for _, p := range order {
+		if !qaPathPattern.MatchString(p) {
+			return fmt.Errorf("不支援的路徑：%s", p)
+		}
+		quoted = append(quoted, psQuote(p))
+	}
+	defer ResetQuickAccessCache()
+	script := qaFindScript + "$want = @(" + strings.Join(quoted, ", ") + ")\n" + qaEditScript
+	out, err := runPowerShell(script, 120*time.Second)
+	if err != nil {
+		return fmt.Errorf("同步快速存取失敗：%w", err)
+	}
+	if res := strings.TrimSpace(string(out)); res != "ok" {
+		return fmt.Errorf("同步快速存取失敗：未預期的輸出 %q", res)
+	}
+	return nil
+}
